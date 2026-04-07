@@ -5,7 +5,6 @@ import os
 import sqlite3
 import json
 import time
-from PIL import Image
 
 # --- CONFIGURAÇÃO DE BACKEND MATPLOTLIB ---
 os.environ["QT_API"] = "pyside6"
@@ -15,8 +14,8 @@ matplotlib.use('QtAgg')
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 import matplotlib.pyplot as plt
 
-from PySide6.QtCore import Qt, QTimer, Signal, Slot, QSize
-from PySide6.QtGui import QImage, QPixmap, QShortcut, QKeySequence, QColor
+from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtGui import QImage, QPixmap, QShortcut, QKeySequence
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                                QHBoxLayout, QPushButton, QLabel, QFrame,
                                QStackedWidget, QSlider, QScrollArea, QGridLayout,
@@ -27,7 +26,6 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
 # ==============================================================================
 DB_NAME = "sistema_industrial.db"
 DIR_DATASET = "dataset_ia"
-COR_DESTAQUE_HEX = "#FF8C00"  # Laranja do novo menu
 CORES_DETECCAO = {
     "AZUL": (np.array([85, 100, 50]), np.array([140, 255, 255]), (255, 0, 0)),
     "PRETO": (np.array([0, 0, 0]), np.array([180, 255, 50]), (60, 60, 60))
@@ -51,6 +49,7 @@ class VideoLabel(QLabel):
             self.clique_esquerdo.emit(event.x(), event.y())
         elif event.button() == Qt.RightButton:
             self.clique_direito.emit(event.x(), event.y())
+        super().mousePressEvent(event)
 
 
 # ==============================================================================
@@ -79,6 +78,8 @@ class VisionProApp(QMainWindow):
         self.modelo_aprendido = None
         self.total_ok = 0
         self.total_fail = 0
+        self.ultimo_motivo_falha = "Sem falhas registadas."
+        self.falhas_por_modelo = {}
         self.ultima_gravacao = 0
         self.valor_threshold = 100
         self.valor_sensibilidade = 800
@@ -169,7 +170,8 @@ class VisionProApp(QMainWindow):
                 ("REFERÊNCIAS", "REFERENCIAS", 0),
                 ("IA / DATASET", "IA / DATASET", 0),
                 ("ESTATÍSTICAS", "ESTATISTICAS", 1),
-                ("COMANDOS", "COMANDOS", 2)]
+                ("COMANDOS", "COMANDOS", 2),
+                ("FALHAS", "FALHAS", 3)]
 
         for nome, chave, idx in abas:
             btn = QPushButton(nome)
@@ -291,9 +293,33 @@ class VisionProApp(QMainWindow):
             btn.setMinimumHeight(60)
             cmd_grid.addWidget(btn, i // 2, i % 2)
 
+        # 4. PÁGINA DE FALHAS
+        self.page_falhas = QWidget()
+        falhas_v = QVBoxLayout(self.page_falhas)
+        falhas_v.setContentsMargins(30, 30, 30, 30)
+
+        self.lbl_falhas_title = QLabel("FALHAS DO MODELO")
+        self.lbl_falhas_title.setStyleSheet("font-size:18px; color:#FF8C00; font-weight:bold;")
+        falhas_v.addWidget(self.lbl_falhas_title)
+
+        falhas_v.addWidget(QLabel("Última falha detetada:"))
+        self.lbl_ultimo_motivo = QLabel("Sem falhas registadas.")
+        self.lbl_ultimo_motivo.setWordWrap(True)
+        self.lbl_ultimo_motivo.setStyleSheet("font-size:16px; color:#E74C3C; font-weight:bold;")
+        falhas_v.addWidget(self.lbl_ultimo_motivo)
+
+        falhas_v.addSpacing(20)
+        falhas_v.addWidget(QLabel("Resumo por motivo (modelo ativo):"))
+        self.lbl_resumo_falhas = QLabel("Sem dados ainda.")
+        self.lbl_resumo_falhas.setWordWrap(True)
+        self.lbl_resumo_falhas.setStyleSheet("font-size:14px; color:#ABB2BF;")
+        falhas_v.addWidget(self.lbl_resumo_falhas)
+        falhas_v.addStretch()
+
         self.pages.addWidget(self.page_video)
         self.pages.addWidget(self.page_stats)
         self.pages.addWidget(self.page_cmds)
+        self.pages.addWidget(self.page_falhas)
 
         main_layout.addWidget(self.sidebar)
         main_layout.addWidget(self.pages)
@@ -363,6 +389,7 @@ class VisionProApp(QMainWindow):
             self.lista_poligonos = json.loads(p[2]) if p[2] else []
             self.total_ok = p[8] if p[8] is not None else 0
             self.total_fail = p[9] if p[9] is not None else 0
+            self.ultimo_motivo_falha = "Sem falhas registadas."
 
             if p[7]:
                 nparr = np.frombuffer(p[7], np.uint8)
@@ -379,9 +406,25 @@ class VisionProApp(QMainWindow):
         txt = f"MODELO: {self.peca_ativa_nome} | ID: {self.peca_ativa_id}"
         self.lbl_nome_peca_top.setText(txt)
         self.lbl_stats_title.setText(f"ESTATÍSTICAS: {self.peca_ativa_nome}")
+        self.lbl_falhas_title.setText(f"FALHAS: {self.peca_ativa_nome}")
         self.card_ok.lbl.setText(str(self.total_ok))
         self.card_nok.lbl.setText(str(self.total_fail))
         self.update_pie(self.total_ok, self.total_fail)
+        self.atualizar_painel_falhas()
+
+    def atualizar_painel_falhas(self):
+        self.lbl_ultimo_motivo.setText(self.ultimo_motivo_falha)
+        if self.peca_ativa_id is None:
+            self.lbl_resumo_falhas.setText("Sem modelo selecionado.")
+            return
+
+        falhas_modelo = self.falhas_por_modelo.get(self.peca_ativa_id, {})
+        if not falhas_modelo:
+            self.lbl_resumo_falhas.setText("Sem dados ainda.")
+            return
+
+        linhas = [f"- {motivo}: {contagem}" for motivo, contagem in sorted(falhas_modelo.items(), key=lambda x: x[1], reverse=True)]
+        self.lbl_resumo_falhas.setText("\n".join(linhas))
 
     def atualizar_lista_modelos(self):
         for i in reversed(range(self.model_layout.count())):
@@ -406,8 +449,11 @@ class VisionProApp(QMainWindow):
             self.ax.text(0.5, 0.5, "Sem Dados", color="white", ha="center")
         else:
             self.ax.pie([ok, nok], labels=["OK", "NOK"], colors=["#2ECC71", "#E74C3C"],
-                        autopct='%1.1f%%', startangle=90, wedgeprops={'width': 0.4})
+                        autopct='%1.1f%%', pctdistance=0.78, labeldistance=1.05, startangle=90,
+                        textprops={'color': 'white', 'fontsize': 10},
+                        wedgeprops={'width': 0.4, 'edgecolor': '#0F1115'})
             self.ax.text(0, 0, f"TOTAL\n{ok + nok}", color='white', ha='center', va='center', fontweight='bold')
+        self.ax.set_aspect('equal')
         self.canvas.draw()
 
     # ==========================================================================
@@ -440,8 +486,8 @@ class VisionProApp(QMainWindow):
             if cnts:
                 c_max = max(cnts, key=cv2.contourArea)
                 if cv2.contourArea(c_max) > self.valor_sensibilidade:
-                    x_b, y_b, w_b, h_b = cv2.boundingRect(c_max)
-                    if 0.4 < (float(w_b) / h_b) < 2.5:
+                    _, _, w_b, h_b = cv2.boundingRect(c_max)
+                    if h_b > 0 and 0.4 < (float(w_b) / h_b) < 2.5:
                         zona_ok = True
                         cv2.drawContours(frame, [c_max], -1, (0, 255, 0), 2)
 
@@ -461,7 +507,7 @@ class VisionProApp(QMainWindow):
 
             if objetos:
                 objetos.sort(key=lambda x: x[0], reverse=True)
-                area, c_prin, cor_prin = objetos[0]
+                _, c_prin, cor_prin = objetos[0]
                 if self.modelo_aprendido is not None:
                     if cv2.matchShapes(self.modelo_aprendido, c_prin, 1, 0.0) > 0.25:
                         status_final = "FAIL";
@@ -472,7 +518,7 @@ class VisionProApp(QMainWindow):
                 cv2.putText(frame, f"{cor_prin} {motivo_fail}", (c_prin[0][0][0], c_prin[0][0][1] - 10),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.6, cor_rect, 2)
 
-        return status_final
+        return status_final, motivo_fail
 
     # ==========================================================================
     # LOOP PRINCIPAL E RENDEREZAÇÃO
@@ -501,7 +547,7 @@ class VisionProApp(QMainWindow):
 
         elif self.aba_ativa == "INSPECAO":
             if self.inspecao_ativa:
-                status = self.executar_inspecao(display_frame)
+                status, motivo_fail = self.executar_inspecao(display_frame)
                 cv2.putText(display_frame, f"STATUS: {status}", (w - 250, 50), cv2.FONT_HERSHEY_SIMPLEX, 1,
                             (0, 255, 0) if status == "OK" else (0, 0, 255), 3)
                 if time.time() - self.ultima_gravacao > 1.2:
@@ -509,6 +555,10 @@ class VisionProApp(QMainWindow):
                         self.total_ok += 1
                     else:
                         self.total_fail += 1
+                        self.ultimo_motivo_falha = motivo_fail or "Falha sem motivo identificado"
+                        if self.peca_ativa_id is not None:
+                            falhas_modelo = self.falhas_por_modelo.setdefault(self.peca_ativa_id, {})
+                            falhas_modelo[self.ultimo_motivo_falha] = falhas_modelo.get(self.ultimo_motivo_falha, 0) + 1
                     self.ultima_gravacao = time.time()
                     self.salvar_progresso_bd()
                     self.atualizar_ui_labels()
@@ -563,7 +613,7 @@ class VisionProApp(QMainWindow):
             if 0 <= real_x < w and 0 <= real_y < h:
                 self.ponto_atual.append((real_x, real_y))
 
-    def gerir_clique_direito(self, x, y):
+    def gerir_clique_direito(self, _x, _y):
         self.ponto_atual = []
 
     def mudar_aba(self, chave, idx):
@@ -587,6 +637,9 @@ class VisionProApp(QMainWindow):
         self.inspecao_ativa = not self.inspecao_ativa
 
     def comando_salvar_s(self):
+        if self.peca_ativa_id is None:
+            QMessageBox.warning(self, "Sem modelo", "Crie ou selecione um modelo primeiro.")
+            return
         if self.aba_ativa == "TREINAR":
             if self.frame_fixo_treino is None:
                 ret, f = self.cap.read()
@@ -608,6 +661,8 @@ class VisionProApp(QMainWindow):
                 self.frame_fixo_treino = None
 
     def salvar_progresso_bd(self):
+        if self.peca_ativa_id is None:
+            return
         conn = sqlite3.connect(DB_NAME)
         conn.execute("UPDATE pecas SET poligonos=?, aprovadas=?, rejeitadas=? WHERE id=?",
                      (json.dumps(self.lista_poligonos), self.total_ok, self.total_fail, self.peca_ativa_id))
@@ -615,6 +670,9 @@ class VisionProApp(QMainWindow):
         conn.close()
 
     def reset_poligonos_db(self):
+        if self.peca_ativa_id is None:
+            QMessageBox.warning(self, "Sem modelo", "Crie ou selecione um modelo primeiro.")
+            return
         if QMessageBox.question(self, "Limpar", "Apagar desenhos do modelo?") == QMessageBox.Yes:
             self.lista_poligonos = [];
             self.ponto_atual = []
@@ -630,6 +688,9 @@ class VisionProApp(QMainWindow):
             self.lista_poligonos.pop()
 
     def capturar_para_ia(self):
+        if self.peca_ativa_id is None:
+            QMessageBox.warning(self, "Sem modelo", "Crie ou selecione um modelo primeiro.")
+            return
         ret, frame = self.cap.read()
         if ret:
             frame = cv2.flip(frame, 1)
@@ -644,6 +705,9 @@ class VisionProApp(QMainWindow):
         self.atualizar_ui_labels()
 
     def renomear_peca(self):
+        if self.peca_ativa_id is None:
+            QMessageBox.warning(self, "Sem modelo", "Crie ou selecione um modelo primeiro.")
+            return
         novo, ok = QInputDialog.getText(self, "Renomear", "Novo nome:", text=self.peca_ativa_nome)
         if ok and novo:
             conn = sqlite3.connect(DB_NAME)
@@ -666,6 +730,9 @@ class VisionProApp(QMainWindow):
         self.atualizar_lista_modelos()
 
     def eliminar_modelo_atual(self):
+        if self.peca_ativa_id is None:
+            QMessageBox.warning(self, "Sem modelo", "Nenhum modelo selecionado para eliminar.")
+            return
         if QMessageBox.question(self, "Eliminar", f"Eliminar {self.peca_ativa_nome}?") == QMessageBox.Yes:
             conn = sqlite3.connect(DB_NAME);
             cursor = conn.cursor()
