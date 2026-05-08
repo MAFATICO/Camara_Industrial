@@ -1,0 +1,13 @@
+# Ignorar pastas de configuração do PyCharm
+.idea/
+
+# Ignorar o ambiente virtual (onde estão as bibliotecas instaladas)
+venv/
+.venv/
+
+# Ignorar ficheiros temporários do Python
+__pycache__/
+*.pyc
+
+# Ignorar ficheiros HTML que o GitHub está a detetar por engano
+*.html

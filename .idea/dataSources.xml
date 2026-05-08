@@ -8,26 +8,5 @@
       <jdbc-url>jdbc:sqlite:C:\Users\pepeg\PycharmProjects\Camara\COLOR_DETECTION\sistema_industrial.db</jdbc-url>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
-    <data-source source="LOCAL" name="sistema_industrial.db [2]" uuid="bac3d6e9-f969-46b5-8096-0c983e1c2ecf">
-      <driver-ref>sqlite.xerial</driver-ref>
-      <synchronize>true</synchronize>
-      <jdbc-driver>org.sqlite.JDBC</jdbc-driver>
-      <jdbc-url>jdbc:sqlite:C:\Users\pepeg\PycharmProjects\Camara\COLOR_DETECTION\sistema_industrial.db</jdbc-url>
-      <working-dir>$ProjectFileDir$</working-dir>
-    </data-source>
-    <data-source source="LOCAL" name="BD_ALTMENU" uuid="24671f68-fc40-4102-900b-1f27939d7130">
-      <driver-ref>sqlite.xerial</driver-ref>
-      <synchronize>true</synchronize>
-      <jdbc-driver>org.sqlite.JDBC</jdbc-driver>
-      <jdbc-url>jdbc:sqlite:$PROJECT_DIR$/COLOR_DETECTION/NAO_INTERESSA/sistema_industrial.db</jdbc-url>
-      <working-dir>$ProjectFileDir$</working-dir>
-    </data-source>
-    <data-source source="LOCAL" name="sistema_industrial [2]" uuid="9ee54c2b-6017-4781-a79b-12ae4f1ccba6">
-      <driver-ref>sqlite.xerial</driver-ref>
-      <synchronize>true</synchronize>
-      <jdbc-driver>org.sqlite.JDBC</jdbc-driver>
-      <jdbc-url>jdbc:sqlite:$PROJECT_DIR$/sistema_industrial.db</jdbc-url>
-      <working-dir>$ProjectFileDir$</working-dir>
-    </data-source>
   </component>
 </project>
