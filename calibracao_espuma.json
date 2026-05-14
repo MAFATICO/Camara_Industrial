@@ -1,0 +1,8 @@
+{
+  "referencia_mm": 30.0,
+  "eixo_medicao": "horizontal",
+  "px_por_mm": 21.333333333333332,
+  "base_altura_px": 0,
+  "thresh_base": 80,
+  "thresh_espuma": 120
+}

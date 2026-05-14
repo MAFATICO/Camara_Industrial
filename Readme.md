@@ -73,7 +73,13 @@ python -m venv .venv
 ### 2. Instalação das Dependências
 Instale todos os pacotes necessários via PIP:
 ```bash
+-pip de instalação para o funcionamento código
 pip install opencv-python numpy PySide6 matplotlib ultralytics
+
+-Colocar o codigo no GIT
+git add .
+git commit -m "Descrição das alterações"
+git push 
 ```
 
 ### 3. Dependências Adicionais de Sistema
