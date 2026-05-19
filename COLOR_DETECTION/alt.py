@@ -10,7 +10,7 @@ from collections import Counter, deque
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 if PROJECT_ROOT not in sys.path:
     sys.path.append(PROJECT_ROOT)
-from COLOR_DETECTION.roi_inspection import ROIInspection
+from roi_inspection import ROIInspection
 
 os.environ["QT_API"] = "pyside6"
 import matplotlib
@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_NAME = os.path.join(BASE_DIR, "../sistema_industrial.db")
-DIR_DATASET = os.path.join(BASE_DIR, "dataset_ia")
+DIR_DATASET = os.path.join(BASE_DIR, "../dataset_ia")
 
 if not os.path.exists(BASE_DIR):
     os.makedirs(BASE_DIR)

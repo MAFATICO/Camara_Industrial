@@ -27,7 +27,7 @@ from falhas_manager import FalhasManager
 
 # Caminho da BD
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_NAME = os.path.join(BASE_DIR, "COLOR_DETECTION/sistema_industrial.db")
+DB_NAME = os.path.join(BASE_DIR, "sistema_industrial.db")
 
 # ==============================================================================
 # CONFIGURAÇÕES DE ESTILO (COMPATÍVEL COM VISION PRO)
