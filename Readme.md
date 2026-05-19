@@ -277,12 +277,12 @@ if __name__ == "__main__":
 │  FILTROS:                 │   PAINEL DE DETALHES            │
 │  - Seleção de Peça        │   - Imagem (300x200)            │
 │  - Texto de Busca         │   - Info (Data/Status/Motivo)   │
-│  - Botões (Exportar, ...)│   - Botões (Reabrir, Análise)  │
+│  - Botões (Exportar, ...) │   - Botões (Reabrir, Análise)   │
 │                           │                                 │
 │  TABELA:                  │                                 │
 │  [📅 DATA] [📊 STATUS]    │                                 │
 │  [⚠️ MOTIVO] [👤 OPERADOR]│                                 │
-│  └─ Duplo clique → Detalhe │                                 │
+│  └─ Duplo clique → Detalhe│                                 │
 │                           │                                 │
 └───────────────────────────┴─────────────────────────────────┘
 ```
@@ -1315,6 +1315,16 @@ python -m venv .venv
 ### Logs e Diagnóstico
 - Sistema completo de logging para troubleshooting
 - Dashboard de saúde do sistema
+
+### Instalação das dependências
+```
+pip install opencv-python numpy PySide6 matplotlib ultralytics
+
+-Colocar o codigo no GIT
+git add .
+git commit -m "Descrição das alterações"
+git push 
+````
 
 ### Atualizações
 - Framework modular para fácil manutenção
