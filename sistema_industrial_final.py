@@ -1198,6 +1198,3 @@ if __name__ == "__main__":
     window = VisionProApp()
     window.showFullScreen()
     sys.exit(app.exec())
-
-
-# verificar a medição qeu nao esta a medir a profundidade e deixar de inspecioanr a distancia
