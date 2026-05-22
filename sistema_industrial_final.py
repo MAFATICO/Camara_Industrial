@@ -12,6 +12,7 @@ if PROJECT_ROOT not in sys.path:
     sys.path.append(PROJECT_ROOT)
 from scripts.roi_inspection import ROIInspection
 from scripts.falhas_manager import FalhasManager
+from depth_integration import DepthMeasurer
 
 os.environ["QT_API"] = "pyside6"
 import matplotlib
@@ -216,7 +217,15 @@ class VisionProApp(QMainWindow):
         self.clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
         self.roi_inspector   = ROIInspection(db_path=DB_NAME)
         self.historico_status = deque(maxlen=7)
-        self.depth_measurer = depthmeasurer(referencia_profundidade_mm=10)
+        self.depth_measurer = None
+        try:
+            self.depth_measurer = DepthMeasurer(
+                modelo="small",
+                referencia_profundidade_mm=10.0
+            )
+            print("✓ Medição 3D ativada")
+        except Exception as e:
+            print(f"⚠ Profundidade 3D não disponível: {e}")
 
         self.scale_factor = 1.0
         self.offset_x = 0
@@ -517,6 +526,71 @@ class VisionProApp(QMainWindow):
         main_layout.addWidget(self.sidebar)
         main_layout.addWidget(self.pages)
 
+        # ── Controlos de medição --
+        ctrl_medicao = QWidget()
+        cm_lay = QHBoxLayout(ctrl_medicao)
+
+        # Coluna 1: Referência em mm
+        ref_col = QVBoxLayout()
+        ref_col.addWidget(QLabel("Dimensão real conhecida (mm):"))
+        self.spin_ref_mm = QDoubleSpinBox()
+        self.spin_ref_mm.setRange(1.0, 9999.0)
+        self.spin_ref_mm.setValue(100.0)
+        self.spin_ref_mm.setSuffix(" mm")
+        self.spin_ref_mm.valueChanged.connect(
+            lambda v: setattr(self, 'medicao_referencia_mm', v)
+        )
+        ref_col.addWidget(self.spin_ref_mm)
+        self.lbl_medicao_estado = QLabel("Estado: sem calibração")
+        self.lbl_medicao_estado.setStyleSheet("color:#FF8C00; font-weight:bold;")
+        ref_col.addWidget(self.lbl_medicao_estado)
+        cm_lay.addLayout(ref_col, stretch=2)
+
+        # Coluna 2: Botões 2D
+        btn_col = QVBoxLayout()
+        btn_congelar = QPushButton("❄ CONGELAR / DEFINIR PONTOS (S)")
+        btn_congelar.setObjectName("ControlBtn")
+        btn_congelar.clicked.connect(self.medicao_congelar_frame)
+        btn_col.addWidget(btn_congelar)
+
+        h_med_btns = QHBoxLayout()
+        btn_calibrar = QPushButton("📐 CALIBRAR COM PONTOS")
+        btn_calibrar.setObjectName("ControlBtn")
+        btn_calibrar.clicked.connect(self.medicao_calibrar)
+        btn_medir = QPushButton("📏 MEDIR CONTINUAMENTE (I)")
+        btn_medir.setObjectName("ControlBtn")
+        btn_medir.clicked.connect(self.toggle_inspecao)
+        btn_limpar_pts = QPushButton("🗑 LIMPAR PONTOS (D)")
+        btn_limpar_pts.setObjectName("DangerBtn")
+        btn_limpar_pts.clicked.connect(self.medicao_limpar_pontos)
+        h_med_btns.addWidget(btn_calibrar)
+        h_med_btns.addWidget(btn_medir)
+        h_med_btns.addWidget(btn_limpar_pts)
+        btn_col.addLayout(h_med_btns)
+
+        # NOVO: Botões 3D
+        h_3d_btns = QHBoxLayout()
+        btn_mapa_3d = QPushButton("🗺️ GERAR MAPA 3D")
+        btn_mapa_3d.setObjectName("ControlBtn")
+        btn_mapa_3d.clicked.connect(self.gerar_mapa_3d)
+
+        btn_calibra_3d = QPushButton("📐 CALIBRAR 3D")
+        btn_calibra_3d.setObjectName("ControlBtn")
+        btn_calibra_3d.clicked.connect(self.calibrar_profundidade_3d)
+
+        btn_detecta = QPushButton("🔍 DETECTAR CAVIDADE")
+        btn_detecta.setObjectName("ControlBtn")
+        btn_detecta.clicked.connect(self.detectar_cavidade_auto)
+
+        h_3d_btns.addWidget(btn_mapa_3d)
+        h_3d_btns.addWidget(btn_calibra_3d)
+        h_3d_btns.addWidget(btn_detecta)
+        btn_col.addLayout(h_3d_btns)
+
+        cm_lay.addLayout(btn_col, stretch=3)
+
+        self.ctrl_stack.addWidget(ctrl_medicao)  # índice 1
+
     def mostrar_app_principal(self, username): # Mostra a app pricipal depois do login
         """Mostra a app principal e guarda o operador autenticado"""
         self.operador_autenticado = username
@@ -648,6 +722,56 @@ class VisionProApp(QMainWindow):
         self.card_nok.lbl.setText(str(self.total_fail))
         self.update_pie(self.total_ok, self.total_fail)
         self.atualizar_painel_falhas()
+
+    def gerar_mapa_3d(self):
+        """Gera mapa de profundidade 3D"""
+        if not self.depth_measurer:
+            QMessageBox.warning(self, "Erro", "Profundidade 3D não disponível")
+            return
+
+        ret, frame = self.cap.read()
+        if ret:
+            frame = cv2.flip(frame, 1)
+            mapa = self.depth_measurer.gerar_mapa(frame)
+            if mapa is not None:
+                QMessageBox.information(self, "Sucesso",
+                                        "Mapa de profundidade gerado!\nPronto para calibrar")
+            else:
+                QMessageBox.warning(self, "Erro", "Falha ao gerar mapa")
+
+    def calibrar_profundidade_3d(self):
+        """Calibra profundidade 3D"""
+        if not self.depth_measurer:
+            return
+
+        prof, ok = QInputDialog.getDouble(
+            self, "Calibração",
+            "Profundidade real do ponto (mm):",
+            value=self.medicao_referencia_mm,
+            min=1.0, max=100.0, decimals=1
+        )
+
+        if ok:
+            QMessageBox.information(self, "Calibração",
+                                    "Clica no frame congelado no ponto a calibrar")
+            # O utilizador clica e a calibração é feita em gerir_clique_esquerdo()
+
+    def detectar_cavidade_auto(self):
+        """Detecta cavidade automaticamente"""
+        if not self.depth_measurer:
+            return
+
+        cavidade = self.depth_measurer.detectar_cavidade()
+        if cavidade:
+            msg = "✓ Cavidade Detectada!\n\n"
+            msg += f"Profundidade Média: {cavidade.get('prof_media_mm', 'N/A'):.2f} mm\n"
+            msg += f"Profundidade Máx: {cavidade.get('prof_max_mm', 'N/A'):.2f} mm\n"
+            msg += f"Profundidade Mín: {cavidade.get('prof_min_mm', 'N/A'):.2f} mm\n"
+            msg += f"Centróide: ({cavidade['centroide_x']}, {cavidade['centroide_y']})\n"
+            msg += f"Área: {cavidade['area_pixels']} pixels"
+            QMessageBox.information(self, "Detecção de Cavidade", msg)
+        else:
+            QMessageBox.warning(self, "Detecção", "Nenhuma cavidade detectada")
 
     def atualizar_painel_falhas(self):
         self.lbl_ultimo_motivo.setText(self.ultimo_motivo_falha)
@@ -981,42 +1105,14 @@ class VisionProApp(QMainWindow):
 
         # ── MEDIÇÃO ──────────────────────────────────────────────────────────
         elif self.aba_ativa == "MEDICAO":
-            # Se está congelado, mostra o frame fixo com os pontos marcados
-            if self.frame_fixo_medicao is not None:
-                display_frame = self.frame_fixo_medicao.copy()
-                cv2.putText(display_frame, "FRAME CONGELADO — clica nos pontos a medir",
-                            (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 0), 2)
-                # Desenha pontos já definidos
-                cores_pts = [(0, 140, 255), (255, 220, 0)]
-                labels    = ["P1", "P2"]
-                for i, pt in enumerate(self.medicao_pontos[:2]):
-                    cv2.circle(display_frame, tuple(map(int, pt)), 6, cores_pts[i], -1)
-                    cv2.putText(display_frame, labels[i],
-                                (int(pt[0]) + 12, int(pt[1]) - 8),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, cores_pts[i], 2)
-                if len(self.medicao_pontos) == 2:
-                    p1 = tuple(map(int, self.medicao_pontos[0]))
-                    p2 = tuple(map(int, self.medicao_pontos[1]))
-                    cv2.line(display_frame, p1, p2, (0, 220, 255), 2)
-                    dist_px = np.linalg.norm(np.array(p1) - np.array(p2))
-                    cv2.putText(display_frame, f"{dist_px:.0f} px — clica CALIBRAR para converter em mm",
-                                (20, h - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (200, 200, 200), 1)
-            else:
-                # Modo medição contínua
-                if self.inspecao_ativa:
-                    _, display_frame = self.medicao_calcular_distancia(display_frame)
-                    # Redesenha os pontos fixos sobre o frame ao vivo
-                    cores_pts = [(0, 140, 255), (255, 220, 0)]
-                    for i, pt in enumerate(self.medicao_pontos[:2]):
-                        cv2.circle(display_frame, tuple(map(int, pt)), 6, cores_pts[i], -1)
-                else:
-                    # Mostra pontos guardados mesmo parado
-                    for i, pt in enumerate(self.medicao_pontos[:2]):
-                        cv2.circle(display_frame, tuple(map(int, pt)), 6,
-                                   [(0, 140, 255), (255, 220, 0)][i], -1)
-                if self.depth_measurer:
-                    self.depth_measurer.gerar_mapa(frame)
-                    display_frame = self.depth_measurer.desenhar_mapa(display_frame, alpha=0.3)
+            if self.depth_measurer and self.inspecao_ativa:
+                self.depth_measurer.gerar_mapa(display_frame)
+                # Desenha mapa com transparência
+                display_frame = self.depth_measurer.desenhar_mapa(
+                    display_frame, alpha=0.3
+                )
+                # Anotações
+                display_frame = self.depth_measurer.anotar_frame(display_frame)
 
         self.exibir_frame(display_frame)
 
@@ -1204,3 +1300,7 @@ if __name__ == "__main__":
     sys.exit(app.exec())
 
    # trocar a inspeção da peça pela medição da profundidade
+   # trocar o botão de inspeção que (I) esta a dar conflito com o botao de medição (M)
+   # verificar se a medição funciona diretio em casa
+   # retirar a função do mapa que esta a pear muito no programa
+   # ajustar/usar a medição_espuma.py para a medição da profundidade e melhorar depois
