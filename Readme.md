@@ -1005,9 +1005,11 @@ conn.close()
 - Frame=None
 
 **Solução:**
+
 ```python
 # Forçar criação tabela
-from falhas_manager import FalhasManager
+from scripts.falhas_manager import FalhasManager
+
 fm = FalhasManager(DB_NAME)
 fm.inicializar_tabela_falhas()  # Cria se não existir
 ```
@@ -1324,6 +1326,7 @@ pip install opencv-python numpy PySide6 matplotlib ultralytics
 git add .
 git commit -m "Descrição das alterações"
 git push 
+git pull --rebase origin master
 ````
 
 ### Atualizações

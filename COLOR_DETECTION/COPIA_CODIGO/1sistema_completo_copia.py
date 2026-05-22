@@ -10,8 +10,8 @@ from collections import Counter, deque
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ""))
 if PROJECT_ROOT not in sys.path:
     sys.path.append(PROJECT_ROOT)
-from roi_inspection import ROIInspection
-from falhas_manager import FalhasManager
+from scripts.roi_inspection import ROIInspection
+from scripts.falhas_manager import FalhasManager
 
 os.environ["QT_API"] = "pyside6"
 import matplotlib
@@ -24,13 +24,13 @@ from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QImage, QPixmap, QShortcut, QKeySequence
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                                QHBoxLayout, QPushButton, QLabel, QFrame,
-                               QStackedWidget, QSlider, QScrollArea, QGridLayout,
+                               QStackedWidget, QScrollArea, QGridLayout,
                                QButtonGroup, QInputDialog, QMessageBox, QLineEdit,
                                QDoubleSpinBox)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_NAME = os.path.join(BASE_DIR, "COLOR_DETECTION/sistema_industrial.db")
-DIR_DATASET = os.path.join(BASE_DIR, "COLOR_DETECTION/dataset_ia")
+DB_NAME = os.path.join(BASE_DIR, "sistema_industrial.db")
+DIR_DATASET = os.path.join(BASE_DIR, "dataset_ia")
 
 if not os.path.exists(BASE_DIR):
     os.makedirs(BASE_DIR)
@@ -386,33 +386,30 @@ class VisionProApp(QMainWindow):
         self.ctrl_stack = QStackedWidget()
 
         # -- Controlos normais (inspeção/treino) --
+        # NOTE: Removemos os sliders de THRESHOLD e SENSIBILIDADE desta vista
+        # conforme solicitado e adicionamos botões adicionais para os atalhos
+        # definidos no projeto (P, R, N).
         ctrl_normal = QWidget()
         cn_lay = QHBoxLayout(ctrl_normal)
-        slid_v = QVBoxLayout()
-        slid_v.addWidget(QLabel("THRESHOLD"))
-        self.slider_thresh = QSlider(Qt.Orientation.Horizontal)
-        self.slider_thresh.setRange(0, 255)
-        self.slider_thresh.setValue(self.valor_threshold)
-        self.slider_thresh.valueChanged.connect(self.set_thresh)
-        slid_v.addWidget(self.slider_thresh)
-        slid_v.addWidget(QLabel("SENSIBILIDADE"))
-        self.slider_sens = QSlider(Qt.Orientation.Horizontal)
-        self.slider_sens.setRange(0, 10000)
-        self.slider_sens.setValue(self.valor_sensibilidade)
-        self.slider_sens.valueChanged.connect(self.set_sens)
-        slid_v.addWidget(self.slider_sens)
-        cn_lay.addLayout(slid_v, stretch=2)
+
+        # Linha de botões de controlo (todos os atalhos principais)
         draw_h = QHBoxLayout()
-        btns_ctrl = [("↺ VOLTAR (Z)", self.retroceder_ponto, "ControlBtn"),
-                     ("🗑️ LIMPAR (D)", self.reset_poligonos_db, "DangerBtn"),
-                     ("💾 SALVAR (S)", self.comando_salvar_s, "ControlBtn"),
-                     ("▶ INSPEÇÃO (I)", self.toggle_inspecao, "ControlBtn")]
+        btns_ctrl = [
+            ("↺ VOLTAR (Z)", self.retroceder_ponto, "ControlBtn"),
+            ("🗑️ LIMPAR (D)", self.reset_poligonos_db, "DangerBtn"),
+            ("💾 SALVAR (S)", self.comando_salvar_s, "ControlBtn"),
+            ("▶ INSPEÇÃO (I)", self.toggle_inspecao, "ControlBtn"),
+            ("📸 CAPTURAR (P)", self.capturar_para_ia, "ControlBtn"),
+            ("🔄 RESET (R)", self.reset_contadores, "ControlBtn"),
+            ("✏ RENOMEAR (N)", self.renomear_peca, "ControlBtn"),
+        ]
         for t, f, style in btns_ctrl:
             b = QPushButton(t)
             b.setObjectName(style)
             b.clicked.connect(f)
             draw_h.addWidget(b)
-        cn_lay.addLayout(draw_h, stretch=3)
+
+        cn_lay.addLayout(draw_h)
         self.ctrl_stack.addWidget(ctrl_normal)  # índice 0
 
         # -- Controlos de medição --
@@ -444,7 +441,7 @@ class VisionProApp(QMainWindow):
         btn_calibrar = QPushButton("📐 CALIBRAR COM PONTOS")
         btn_calibrar.setObjectName("ControlBtn")
         btn_calibrar.clicked.connect(self.medicao_calibrar)
-        btn_medir = QPushButton("📏 MEDIR CONTINUAMENTE (I)")
+        btn_medir = QPushButton("📏 MEDIR CONTINUAMENTE (M)")
         btn_medir.setObjectName("ControlBtn")
         btn_medir.clicked.connect(self.toggle_inspecao)
         btn_limpar_pts = QPushButton("🗑 LIMPAR PONTOS (D)")
@@ -1002,7 +999,7 @@ class VisionProApp(QMainWindow):
                 cores_pts = [(0, 140, 255), (255, 220, 0)]
                 labels = ["P1", "P2"]
                 for i, pt in enumerate(self.medicao_pontos[:2]):
-                    cv2.circle(display_frame, tuple(map(int, pt)), 8, cores_pts[i], -1)
+                    cv2.circle(display_frame, tuple(map(int, pt)), 6, cores_pts[i], -1)
                     cv2.putText(display_frame, labels[i],
                                 (int(pt[0]) + 12, int(pt[1]) - 8),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, cores_pts[i], 2)
@@ -1022,10 +1019,6 @@ class VisionProApp(QMainWindow):
                     for i, pt in enumerate(self.medicao_pontos[:2]):
                         cv2.circle(display_frame, tuple(map(int, pt)), 6, cores_pts[i], -1)
                 else:
-                    cv2.putText(display_frame, "Prima [S] para congelar e definir pontos",
-                                (20, h // 2 - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (200, 200, 200), 2)
-                    cv2.putText(display_frame, "Prima [I] para iniciar medição contínua",
-                                (20, h // 2 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (200, 200, 200), 2)
                     # Mostra pontos guardados mesmo parado
                     for i, pt in enumerate(self.medicao_pontos[:2]):
                         cv2.circle(display_frame, tuple(map(int, pt)), 6,
@@ -1230,7 +1223,3 @@ if __name__ == "__main__":
     window = VisionProApp()
     window.showFullScreen()
     sys.exit(app.exec())
-
-# adicionar os botões qeu faltam na aba de baixo no menu de inspeção e medição
-# verificar a medição qeu nao esta a medir a profundidade e nao esta a deixar inspecioanr a distancia
-# verificar os botões que faltam comados para a mediça~ficar a funcionar direito

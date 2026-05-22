@@ -10,8 +10,8 @@ from collections import Counter, deque
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ""))
 if PROJECT_ROOT not in sys.path:
     sys.path.append(PROJECT_ROOT)
-from roi_inspection import ROIInspection
-from falhas_manager import FalhasManager
+from scripts.roi_inspection import ROIInspection
+from scripts.falhas_manager import FalhasManager
 
 os.environ["QT_API"] = "pyside6"
 import matplotlib
@@ -216,6 +216,7 @@ class VisionProApp(QMainWindow):
         self.clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
         self.roi_inspector   = ROIInspection(db_path=DB_NAME)
         self.historico_status = deque(maxlen=7)
+        self.depth_measurer = depthmeasurer(referencia_profundidade_mm=10)
 
         self.scale_factor = 1.0
         self.offset_x = 0
@@ -436,7 +437,7 @@ class VisionProApp(QMainWindow):
         btn_calibrar = QPushButton("📐 CALIBRAR COM PONTOS")
         btn_calibrar.setObjectName("ControlBtn")
         btn_calibrar.clicked.connect(self.medicao_calibrar)
-        btn_medir = QPushButton("📏 MEDIR CONTINUAMENTE (I)")
+        btn_medir = QPushButton("📏 MEDIR CONTINUAMENTE (M)")
         btn_medir.setObjectName("ControlBtn")
         btn_medir.clicked.connect(self.toggle_inspecao)
         btn_limpar_pts = QPushButton("🗑 LIMPAR PONTOS (D)")
@@ -477,7 +478,11 @@ class VisionProApp(QMainWindow):
         comandos_txt = ["[ S ] - SALVAR / CONGELAR",      "[ I ] - INICIAR / PARAR INSPEÇÃO",
                         "[ Z ] - RETROCEDER PONTO",        "[ D ] - LIMPAR DESENHOS / PONTOS",
                         "[ P ] - CAPTURAR PARA IA",        "[ R ] - RESETAR CONTADORES",
-                        "[ N ] - RENOMEAR MODELO",         "[ MEDIÇÃO ] - Definir 2 pontos → calibrar → medir"]
+                        "[ N ] - RENOMEAR MODELO",         "",
+                        "[ M ] - MEDIR PROFUNDIDADE",      "",
+                        "[ C ] - CALIBRAR PONTOS",         "",
+                        "",                                "",
+                        "",                                ""]  # Último slot vazio para manter grid
         for i, txt in enumerate(comandos_txt):
             btn = QPushButton(txt)
             btn.setObjectName("ControlBtn")
@@ -512,7 +517,7 @@ class VisionProApp(QMainWindow):
         main_layout.addWidget(self.sidebar)
         main_layout.addWidget(self.pages)
 
-    def mostrar_app_principal(self, username):
+    def mostrar_app_principal(self, username): # Mostra a app pricipal depois do login
         """Mostra a app principal e guarda o operador autenticado"""
         self.operador_autenticado = username
         self.main_stack.setCurrentIndex(1)
@@ -695,7 +700,7 @@ class VisionProApp(QMainWindow):
         conn.commit(); conn.close()
 
     # ──────────────────────────────────────────────────────────────────────────
-    # MEDIÇÃO DE DISTÂNCIA — lógica central
+    # MEDIÇÃO DE DISTÂNCIA — lógica central  pode sair do codigo
     # ──────────────────────────────────────────────────────────────────────────
     def medicao_congelar_frame(self):
         """Congela o frame actual para o utilizador definir os pontos de medição."""
@@ -1005,14 +1010,13 @@ class VisionProApp(QMainWindow):
                     for i, pt in enumerate(self.medicao_pontos[:2]):
                         cv2.circle(display_frame, tuple(map(int, pt)), 6, cores_pts[i], -1)
                 else:
-                    cv2.putText(display_frame, "Prima [S] para congelar e definir pontos",
-                                (20, h // 2 - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (200, 200, 200), 2)
-                    cv2.putText(display_frame, "Prima [I] para iniciar medição contínua",
-                                (20, h // 2 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (200, 200, 200), 2)
                     # Mostra pontos guardados mesmo parado
                     for i, pt in enumerate(self.medicao_pontos[:2]):
                         cv2.circle(display_frame, tuple(map(int, pt)), 6,
                                    [(0, 140, 255), (255, 220, 0)][i], -1)
+                if self.depth_measurer:
+                    self.depth_measurer.gerar_mapa(frame)
+                    display_frame = self.depth_measurer.desenhar_mapa(display_frame, alpha=0.3)
 
         self.exibir_frame(display_frame)
 
@@ -1034,7 +1038,7 @@ class VisionProApp(QMainWindow):
         self.video_label.setPixmap(pix)
 
     # ──────────────────────────────────────────────────────────────────────────
-    # CLIQUES
+    # CLIQUES DIRETO E ESQUERDO
     # ──────────────────────────────────────────────────────────────────────────
     def gerir_clique_esquerdo(self, x, y):
         # Converte coordenadas do widget para coordenadas reais da imagem
@@ -1198,3 +1202,5 @@ if __name__ == "__main__":
     window = VisionProApp()
     window.showFullScreen()
     sys.exit(app.exec())
+
+   # trocar a inspeção da peça pela medição da profundidade

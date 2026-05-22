@@ -19,7 +19,7 @@ import cv2
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ""))
 if PROJECT_ROOT not in sys.path:
     sys.path.append(PROJECT_ROOT)
-from COLOR_DETECTION.falhas_manager import FalhasManager
+from scripts.falhas_manager import FalhasManager
 
 # Caminho da BD
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))

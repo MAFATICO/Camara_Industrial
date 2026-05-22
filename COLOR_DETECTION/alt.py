@@ -10,7 +10,7 @@ from collections import Counter, deque
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 if PROJECT_ROOT not in sys.path:
     sys.path.append(PROJECT_ROOT)
-from roi_inspection import ROIInspection
+from scripts.roi_inspection import ROIInspection
 
 os.environ["QT_API"] = "pyside6"
 import matplotlib
