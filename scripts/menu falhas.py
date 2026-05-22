@@ -1,33 +1,29 @@
 import sys
 import os
 import sqlite3
-import random
 import numpy as np
-from datetime import datetime, timedelta
 
 os.environ["QT_API"] = "pyside6"
 import matplotlib
 matplotlib.use('QtAgg')
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                                QHBoxLayout, QLabel, QTableWidget, QTableWidgetItem,
                                QPushButton, QHeaderView, QFrame, QLineEdit,
-                               QScrollArea, QMessageBox, QComboBox)
-from PySide6.QtCore import Qt, QTimer, QByteArray, QBuffer, QIODevice
+                               QComboBox)
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap, QImage
 
 import cv2
-import matplotlib.pyplot as plt
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ""))
 if PROJECT_ROOT not in sys.path:
     sys.path.append(PROJECT_ROOT)
-from falhas_manager import FalhasManager
+from COLOR_DETECTION.falhas_manager import FalhasManager
 
 # Caminho da BD
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_NAME = os.path.join(BASE_DIR, "sistema_industrial.db")
+DB_NAME = os.path.join(BASE_DIR, "../sistema_industrial.db")
 
 # ==============================================================================
 # CONFIGURAÇÕES DE ESTILO (COMPATÍVEL COM VISION PRO)
