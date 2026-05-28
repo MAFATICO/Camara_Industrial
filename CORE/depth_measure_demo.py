@@ -8,7 +8,7 @@ Demo para medir a altura da espuma (diferen√ßa Z_ref - Z_medido) usando calibra√
 
 import cv2
 import argparse
-from scripts.depth_module import MedidorProfundidadeIA, DEPTH_AI_DISPONIVEL
+from CORE.depth_module import MedidorProfundidadeIA, DEPTH_AI_DISPONIVEL
 
 
 def mouse_cb(event, x, y, flags, param):

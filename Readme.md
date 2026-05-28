@@ -40,32 +40,32 @@ O **VISION PRO** é uma solução industrial completa de **inspeção visual aut
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│         VISION PRO - Sistema Industrial                      │
+│         VISION PRO - Sistema Industrial                     │
 ├─────────────────────────────────────────────────────────────┤
-│                                                               │
+│                                                             │
 │  ┌──────────────┐      ┌──────────────┐      ┌────────────┐ │
 │  │   LOGIN      │  →   │   MAIN APP   │  →   │  MODULES   │ │
 │  │  (Users DB)  │      │  (PySide6)   │      │            │ │
 │  └──────────────┘      └──────────────┘      ├────────────┤ │
-│                               ↓               │ • Inspecção│ │
-│                        ┌──────────────┐       │ • Treino   │ │
-│                        │   CAMERA     │       │ • Medição  │ │
-│                        │  (OpenCV)    │       │ • Falhas   │ │
-│                        └──────────────┘       │ • Stats    │ │
-│                               ↓               └────────────┘ │
-│                        ┌──────────────┐                       │
-│                        │  PROCESSING  │                       │
-│                        │  (ROI/HSV)   │                       │
-│                        └──────────────┘                       │
-│                               ↓                               │
-│        ┌──────────────────────────────────────────────────┐  │
-│        │  FALHAS_MANAGER (Histórico + Imagens)           │  │
-│        └──────────────────────────────────────────────────┘  │
-│                               ↓                               │
-│        ┌──────────────────────────────────────────────────┐  │
-│        │  DATABASE (SQLite - usuarios/pecas/falhas)      │  │
-│        └──────────────────────────────────────────────────┘  │
-│                                                               │
+│                               ↓              │ • Inspecção│ │
+│                        ┌──────────────┐      │ • Treino   │ │
+│                        │   CAMERA     │      │ • Medição  │ │
+│                        │  (OpenCV)    │      │ • Falhas   │ │
+│                        └──────────────┘      │ • Stats    │ │
+│                               ↓              └────────────┘ │
+│                        ┌──────────────┐                     │
+│                        │  PROCESSING  │                     │
+│                        │  (ROI/HSV)   │                     │
+│                        └──────────────┘                     │
+│                               ↓                             │
+│        ┌──────────────────────────────────────────────────┐ │
+│        │  FALHAS_MANAGER (Histórico + Imagens)            │ │
+│        └──────────────────────────────────────────────────┘ │
+│                               ↓                             │
+│        ┌──────────────────────────────────────────────────┐ │
+│        │  DATABASE (SQLite - usuarios/pecas/falhas)       │ │
+│        └──────────────────────────────────────────────────┘ │
+│                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -262,7 +262,7 @@ Inicializa após login:
 ```python
 if __name__ == "__main__":
     operador = sys.argv[1] if len(sys.argv) > 1 else "demo"
-    # Ex: python "menu falhas.py" admin
+    # Ex: python "laser_processing.py" admin
     # → operador será "admin"
 ```
 
@@ -465,7 +465,7 @@ C:\Users\pepeg\PycharmProjects\Camara\COLOR_DETECTION\sistema_industrial.db
 #### Tabela 1: `usuarios`
 ```sql
 ┌─────────────┬──────────┐
-│ username(*)│ password │
+│ username(*)│ password  │
 ├─────────────┼──────────┤
 │ admin       │ 1234     │
 │ operador1   │ pass123  │
@@ -496,7 +496,7 @@ imagem aqui
 │ id │ peca_id │ operador │ data_hora            │ status │ motivo │ imagem_blob │ timestamp│
 ├────┼─────────┼──────────┼──────────────────────┼────────┼────────┼─────────────┼──────────┤
 │ 1  │ 1       │ "admin"  │ "15/05/2026 14:30:45"│ "OK"   │ "---"  │ [JPEG BLOB] │ 1715...  │
-│ 2  │ 1       │ "admin"  │ "15/05/2026 14:32:10"│ "FAIL" │ "Forma│ [JPEG BLOB] │ 1715...  │
+│ 2  │ 1       │ "admin"  │ "15/05/2026 14:32:10"│ "FAIL" │ "Forma │ [JPEG BLOB] │ 1715...  │
 │    │         │          │                      │        │ Errada"│             │          │
 └────┴─────────┴──────────┴──────────────────────┴────────┴────────┴─────────────┴──────────┘
 ```
@@ -545,29 +545,29 @@ imagem aqui
 ```
 ┌─────────────┬──────────────────────────────────────────────┐
 │   SIDEBAR   │          ÁREA CENTRAL (PAGES)                │
-│  (260px)    │                                               │
-│             │  PAGE 0: VIDEO + CONTROLOS                  │
-│ • INSPEÇÃO  │  ┌──────────────────────────────────────┐  │
-│ • TREINAR   │  │         VÍDEO (640x480)               │  │
-│ • REFERÊNCIAS  │  │    Frame com overlay de ROIs       │  │
-│ • IA        │  │                                       │  │
-│ • MEDIÇÃO   │  └──────────────────────────────────────┘  │
-│ • ESTATÍSTICAS  │  ┌─ BOTTOM BAR (dinâmica) ─────────┐   │
-│ • COMANDOS  │  │  • Sliders (Threshold/Sens)    │   │
-│ • FALHAS    │  │  • Botões (Voltar/Limpar/Salvar│   │
-│             │  ├──────────────────────────────────┘   │
-│ MODELOS     │  PAGE 1: ESTATÍSTICAS                   │
-│ [+ NOVO]    │  ┌──────────────────────────────────┐   │
-│ [- APAGAR]  │  │ Card OK: 145  Card FAIL: 32     │   │
-│             │  │ Gráfico Pizza (OK/FAIL %)       │   │
-│ Scroll:    │  │                                  │   │
-│ • ID 01:... │  └──────────────────────────────────┘   │
-│ • ID 02:... │                                         │
-│ • ID 03:... │  PAGE 2: COMANDOS                      │
-│             │  [[ S ] SALVAR]  [[ I ] INSPEÇÃO]      │
-│ [LOGOUT]    │  [[ Z ] VOLTAR]  [[ D ] LIMPAR]        │
-│             │  [[ P ] CAPTURA] [[ R ] RESETAR]       │
-└─────────────┴──────────────────────────────────────────┘
+│  (260px)    │                                              │
+│             │  PAGE 0: VIDEO + CONTROLOS                   │
+│ • INSPEÇÃO  │  ┌──────────────────────────────────────┐    │
+│ • TREINAR   │  │         VÍDEO (640x480)              │    │
+│ • REF.      │  │    Frame com overlay de ROIs         │    │
+│ • IA        │  │                                      │    │
+│ • MEDIÇÃO   │  └──────────────────────────────────────┘    │
+│ • STATS     │  ┌─ BOTTOM BAR (dinâmica) ─────────┐         │
+│ • COMANDOS  │  │  • Sliders (Threshold/Sens)     │         │
+│             │  │  • Botões (Voltar/Limpar/Salvar │         │
+│             │  ├─────────────────────────────────┘         │
+│ MODELOS     │  PAGE 1: ESTATÍSTICAS                        │
+│ [+ NOVO]    │  ┌──────────────────────────────────┐        │
+│ [- APAGAR]  │  │ Card OK: 145  Card FAIL: 32      │        │
+│             │  │ Gráfico Pizza (OK/FAIL %)        │        │
+│ Scroll:     │  │                                  │        │
+│ • ID 01:... │  └──────────────────────────────────┘        │
+│ • ID 02:... │                                              │
+│ • ID 03:... │  PAGE 2: COMANDOS                            │
+│             │  [[ S ] SALVAR]  [[ I ] INSPEÇÃO]            │
+│ [LOGOUT]    │  [[ Z ] VOLTAR]  [[ D ] LIMPAR]              │
+│             │  [[ P ] CAPTURA] [[ R ] RESETAR]             │
+└─────────────┴──────────────────────────────────────────────┘
 ```
 
 ### Estados da Interface
@@ -628,32 +628,6 @@ imagem aqui
 
 imagem aqui
 
-#### Estado 5: HISTÓRICO DE FALHAS (menu falhas.py)
-
-```
-┌────────────────────────────────────────────────────────────┐
-│ Header: "📋 HISTÓRICO DE FALHAS"                          │
-│ Operador: admin                                            │
-├─────────────────────┬────────────────────────────────────┤
-│ Filtros:           │ DETALHES DA FALHA                 │
-│ • Peça: [combo]    │ ┌──────────────────────────────┐ │
-│ • Busca: [text]    │ │  [300x200 Imagem do FAIL]    │ │
-│ • [Exportar CSV]   │ │                              │ │
-│ • [Recarregar]     │ └──────────────────────────────┘ │
-│                    │                                  │
-│ TABELA:            │ 📅 Data: 15/05/2026 14:30      │
-│ ┌────────────────┤ 📊 Status: FAIL                  │
-│ │ DATA |STATUS|  │ ⚠️ Motivo: Forma Errada         │
-│ │      | OK  |  │                                  │
-│ │      | ✗ FAIL│ [🔍 REABRIR] [📊 ANÁLISE]        │
-│ │      | ✓ OK  │                                  │
-│ │      | ✗ FAIL│                                  │
-│ └────────────────┤                                  │
-└─────────────────┴────────────────────────────────────┘
-```
-
-imagem aqui
-
 ---
 
 ## 🖥️ Processamento de Imagem
@@ -664,7 +638,7 @@ imagem aqui
 FRAME CAPTURADO (BGR, 640x480)
        ↓
 ├─────────────────────────────────────────────────────────────┐
-│ PASSO 1: PRÉ-PROCESSAMENTO                                   │
+│ PASSO 1: PRÉ-PROCESSAMENTO                                  │
 ├─────────────────────────────────────────────────────────────┤
 │ 1. Bilateral Filter (9x9, 75,75) → Reduz ruído              │
 │ 2. CLAHE (clipLimit=3.0, 8x8) → Iguala iluminação           │
@@ -674,47 +648,47 @@ FRAME CAPTURADO (BGR, 640x480)
 ├─────────────────────────────────────────────────────────────┐
 │ PASSO 2: PROCESSAMENTO DE ROI                               │
 ├─────────────────────────────────────────────────────────────┤
-│ Para cada ROI definido:                                       │
-│ 1. Extrai máscara do polígono                                │
-│ 2. Calcula fill_ratio (% preenchimento)                      │
-│ 3. Status ROI: OK (fill > limiar) ou AGUARDAR              │
+│ Para cada ROI definido:                                     │
+│ 1. Extrai máscara do polígono                               │
+│ 2. Calcula fill_ratio (% preenchimento)                     │
+│ 3. Status ROI: OK (fill > limiar) ou AGUARDAR               │
 │ Se algum ROI = FAIL → status_global = FAIL                  │
 └─────────────────────────────────────────────────────────────┘
        ↓
 ├─────────────────────────────────────────────────────────────┐
 │ PASSO 3: DETECÇÃO DE CORES (HSV)                            │
 ├─────────────────────────────────────────────────────────────┤
-│ Definições em CORES_DETECCAO:                                │
-│                                                              │
-│ AZUL:  H∈[85,140]  S∈[100,255]  V∈[50,255]                 │
+│ Definições em CORES_DETECCAO:                               │
+│                                                             │
+│ AZUL:  H∈[85,140]  S∈[100,255]  V∈[50,255]                  │
 │        Cor: (255, 0, 0) em BGR → Azul                       │
-│                                                              │
+│                                                             │
 │ PRETO: H∈[0,150]  S∈[0,50]  V∈[0,50]                        │
 │        Cor: (60, 60, 60) em BGR → Cinzento escuro           │
-│                                                              │
-│ Para cada cor:                                               │
+│                                                             │
+│ Para cada cor:                                              │
 │ 1. cv2.inRange(hsv, low, high) → Máscara binária            │
-│ 2. AND com máscara de ROI                                    │
+│ 2. AND com máscara de ROI                                   │
 │ 3. cv2.findContours() → Objetos detectados                  │
 └─────────────────────────────────────────────────────────────┘
        ↓
 ├─────────────────────────────────────────────────────────────┐
-│ PASSO 4: COMPARAÇÃO DE FORMA                                 │
+│ PASSO 4: COMPARAÇÃO DE FORMA                                │
 ├─────────────────────────────────────────────────────────────┤
-│ Se modelo aprendido existe:                                  │
-│ 1. Encontra maior contorno detectado                         │
-│ 2. Calcula cv2.matchShapes(modelo, contorno, 1, 0.0)       │
-│ 3. Se resultado > 0.25 → FAIL "Forma Errada"               │
+│ Se modelo aprendido existe:                                 │
+│ 1. Encontra maior contorno detectado                        │
+│ 2. Calcula cv2.matchShapes(modelo, contorno, 1, 0.0)        │
+│ 3. Se resultado > 0.25 → FAIL "Forma Errada"                │
 │ 4. Senão → resultado_global mantém seu status               │
 └─────────────────────────────────────────────────────────────┘
        ↓
 ├─────────────────────────────────────────────────────────────┐
 │ PASSO 5: SUAVIZAÇÃO DE STATUS                               │
 ├─────────────────────────────────────────────────────────────┤
-│ Usa deque de 7 frames anterior:                              │
+│ Usa deque de 7 frames anterior:                             │
 │ - Se status == "AGUARDAR" → limpa histórico                 │
-│ - Senão → adiciona ao histórico                              │
-│ - Counter.most_common() → Resultado mais frequente           │
+│ - Senão → adiciona ao histórico                             │
+│ - Counter.most_common() → Resultado mais frequente          │
 │ Evita falsos positivos rápidos                              │
 └─────────────────────────────────────────────────────────────┘
        ↓
@@ -744,7 +718,7 @@ imagem aqui
 ### Fluxo Completo de Registar Falha
 
 ```python
-# Em sistema_industrial_final.py, linha ~930
+# Em main.py, linha ~930
 
 if time.time() - self.ultima_gravacao > 1.2:
     if status == "OK":
@@ -856,7 +830,7 @@ Resultado:
    └─ "Utilizador ou palavra-passe incorretos!"
 ```
 
-imagem aqui
+![img.png](img.png)
 
 ### Credenciais Padrão
 
@@ -877,7 +851,7 @@ imagem aqui
 
 ## 💡 Exemplos Práticos
 
-### Exemplo 1: Inspecionar Peça Metálica com ROI
+### Exemplo 1: Inspecionar Peça com ROI
 
 ```
 SETUP:
@@ -899,7 +873,7 @@ RESULTADO:
 
 imagem aqui
 
-### Exemplo 2: Medir Comprimento de Objeto
+### Exemplo 2: Medir espessura da espuma
 
 ```
 SETUP:
@@ -919,33 +893,6 @@ MEDIÇÃO:
 
 imagem aqui
 
-### Exemplo 3: Analisar Histórico de Falhas
-
-```
-SETUP:
-1. Abre: python "menu falhas.py" admin
-2. Janela com histórico de todas as peças
-
-INTERAÇÃO:
-3. Seleciona "Peça_A" no combo
-4. Vê últimas 100 falhas dessa peça
-5. Digita "Forma" na busca
-6. Tabela filtra apenas falhas de forma
-7. Clica em linha → painel direito mostra:
-   - Foto exata do momento do FAIL
-   - Data/Hora
-   - Operador que inspecionou
-   - Motivo específico
-
-ANÁLISE:
-8. "Forma Errada" aconteceu 15x
-9. Operador "admin" registou 12 delas
-10. Tendência: começou a aumentar ontem
-```
-
-imagem aqui
-
----
 
 ## 🆘 Troubleshooting
 
@@ -1008,7 +955,7 @@ conn.close()
 
 ```python
 # Forçar criação tabela
-from scripts.falhas_manager import FalhasManager
+from SCRIPTS.falhas_manager import FalhasManager
 
 fm = FalhasManager(DB_NAME)
 fm.inicializar_tabela_falhas()  # Cria se não existir

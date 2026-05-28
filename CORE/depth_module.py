@@ -183,4 +183,4 @@ class MedidorProfundidadeIA:
 
 
 if __name__ == "__main__":
-    print("Este módulo fornece MedidorProfundidadeIA — importe-o nos teus scripts.")
+    print("Este módulo fornece MedidorProfundidadeIA — importe-o nos teus SCRIPTS.")

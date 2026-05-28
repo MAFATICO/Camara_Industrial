@@ -1,7 +1,7 @@
 """
 ROI INSPECTION MODULE
 Aplica Regions of Interest (ROI) na inspeção de peças com base nos polígonos
-desenhados durante a fase de treino no sistema_industrial_final.py
+desenhados durante a fase de treino no main.py
 """
 
 import cv2

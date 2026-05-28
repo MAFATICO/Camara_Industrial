@@ -12,7 +12,7 @@ Fluxo:
 import cv2
 import time
 import argparse
-from scripts.depth_module import MedidorProfundidadeIA, DEPTH_AI_DISPONIVEL
+from CORE.depth_module import MedidorProfundidadeIA, DEPTH_AI_DISPONIVEL
 
 
 def main(args):

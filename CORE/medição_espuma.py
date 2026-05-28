@@ -20,14 +20,14 @@ except ImportError:
 class ValidadorProfundidadeComDataset:
     """
     Validador de profundidade que usa:
-    1. Dataset existente (COLOR_DETECTION/dataset_ia)
+    1. Dataset existente (COLOR_DETECTION/DATASET)
     2. Histórico de falhas (base de dados)
     3. Modelo Depth-Anything para aprender padrões específicos da tua aplicação
     """
 
     def __init__(self, db_path=None, dataset_path=None, modelo="small", referencia_profundidade_mm=10.0):
         self.db_path = db_path or "COLOR_DETECTION/sistema_industrial.db"
-        self.dataset_path = dataset_path or "COLOR_DETECTION/dataset_ia"
+        self.dataset_path = dataset_path or "COLOR_DETECTION/DATASET"
         self.modelo_nome = modelo
         self.referencia_profundidade_mm = referencia_profundidade_mm
 
