@@ -378,6 +378,7 @@ class VisionProApp(QMainWindow):
             ("📸 CAPTURAR (P)", self.capturar_para_ia,   "ControlBtn"),
             ("🔄 RESET (R)",    self.reset_contadores,   "ControlBtn"),
             ("✏ RENOMEAR (N)",  self.renomear_peca,      "ControlBtn"),
+            ("Bloquear (B)",     self.bloquear_ecra,      "Control.Btn"),
         ]
         for t, f, style in btns_ctrl:
             b = QPushButton(t); b.setObjectName(style); b.clicked.connect(f); draw_h.addWidget(b)
