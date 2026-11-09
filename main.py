@@ -25,7 +25,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                                QHBoxLayout, QPushButton, QLabel, QFrame,
                                QStackedWidget, QScrollArea, QGridLayout,
                                QButtonGroup, QInputDialog, QMessageBox, QLineEdit,
-                               QDoubleSpinBox)
+                               QDoubleSpinBox, QPlainTextEdit)
 
 BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
 DB_NAME     = os.path.join(BASE_DIR, "sistema_industrial.db")
@@ -202,6 +202,7 @@ class VisionProApp(QMainWindow):
         self.clahe         = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
         self.roi_inspector = ROIInspection(db_path=DB_NAME)
         self.historico_status = deque(maxlen=7)
+        self.lista_falhas = deque(maxlen=20)
 
         self.scale_factor = 1.0
         self.offset_x     = 0
@@ -233,7 +234,7 @@ class VisionProApp(QMainWindow):
 
         self.carregar_dados_iniciais()
 
-    # ────────────────────────────────────────────────────────────────��[...]
+    # ────���───────────────────────────────────────────────────────────��[...]
     # ESTILOS
     # ────────────────────────────────────────────────────────────────��[...]
     def _apply_style(self):
@@ -263,6 +264,7 @@ class VisionProApp(QMainWindow):
             QSlider::handle:horizontal { background: #FF8C00; width: 14px; height: 14px; margin: -5px 0; border-radius: 7px; }
             QLineEdit { background-color: #0F1115; border: 1px solid #3E4451; color: white; padding: 8px; border-radius: 4px; }
             QDoubleSpinBox { background-color: #0F1115; border: 1px solid #3E4451; color: white; padding: 6px; border-radius: 4px; }
+            QPlainTextEdit { background-color: #0F1115; border: 1px solid #3E4451; color: white; }
         """)
 
     # ────────────────────────────────────────────────────────────────��[...]
@@ -305,6 +307,7 @@ class VisionProApp(QMainWindow):
                 ("IA / DATASET", "IA / DATASET",0),
                 ("MEDIÇÃO",      "MEDICAO",     0),
                 ("ESTATÍSTICAS", "ESTATISTICAS",1),
+                ("FALHAS",       "FALHAS",     3),
                 ("COMANDOS",     "COMANDOS",    2),
 ]
         for nome, chave, idx in abas:
@@ -317,7 +320,7 @@ class VisionProApp(QMainWindow):
         btn_logout = QPushButton("SAIR / BLOQUEAR")
         btn_logout.setObjectName("NavBtn")
         btn_logout.setStyleSheet("color: #FF5555;")
-        btn_logout.clicked.connect(lambda: self.main_stack.setCurrentIndex(0))
+        btn_logout.clicked.connect(self.bloquear_ecra)
         side_v.addSpacing(10)
         side_v.addWidget(btn_logout)
         side_v.addSpacing(25)
@@ -378,7 +381,7 @@ class VisionProApp(QMainWindow):
             ("📸 CAPTURAR (P)", self.capturar_para_ia,   "ControlBtn"),
             ("🔄 RESET (R)",    self.reset_contadores,   "ControlBtn"),
             ("✏ RENOMEAR (N)",  self.renomear_peca,      "ControlBtn"),
-            ("Bloquear (B)",     self.bloquear_ecra,      "Control.Btn"),
+            ("Bloquear (B)",     self.bloquear_ecra,      "ControlBtn"),
         ]
         for t, f, style in btns_ctrl:
             b = QPushButton(t); b.setObjectName(style); b.clicked.connect(f); draw_h.addWidget(b)
@@ -479,6 +482,19 @@ class VisionProApp(QMainWindow):
         self.canvas = FigureCanvas(self.fig)
         stats_v.addWidget(self.canvas)
 
+        # Página 3 — Falhas
+        self.page_falhas = QWidget()
+        falhas_v = QVBoxLayout(self.page_falhas)
+        falhas_v.setContentsMargins(30, 30, 30, 30)
+        label_falhas = QLabel("FALHAS REGISTADAS")
+        label_falhas.setStyleSheet("font-size:18px; color:#FF8C00; font-weight:bold;")
+        falhas_v.addWidget(label_falhas)
+        self.txt_falhas = QPlainTextEdit()
+        self.txt_falhas.setReadOnly(True)
+        self.txt_falhas.setPlaceholderText("Nenhuma falha registada.")
+        self.txt_falhas.setStyleSheet("background:#0F1115; color:#ABB2BF; border:1px solid #3E4451; border-radius:6px;")
+        falhas_v.addWidget(self.txt_falhas)
+
         # Página 2 — Comandos
         self.page_cmds = QWidget()
         cmd_grid = QGridLayout(self.page_cmds)
@@ -498,6 +514,7 @@ class VisionProApp(QMainWindow):
         self.pages.addWidget(self.page_video)    # 0
         self.pages.addWidget(self.page_stats)    # 1
         self.pages.addWidget(self.page_cmds)     # 2
+        self.pages.addWidget(self.page_falhas)   # 3
 
         main_layout.addWidget(self.sidebar)
         main_layout.addWidget(self.pages)
@@ -529,6 +546,30 @@ class VisionProApp(QMainWindow):
         QShortcut(QKeySequence("V"), self, self.depth_calibrar)
         QShortcut(QKeySequence("F"), self, self.depth_capturar_referencia)
         QShortcut(QKeySequence("E"), self, self.depth_medir_espessura)
+
+    def registar_falha(self, motivo):
+        if not motivo:
+            return
+        msg = f"{time.strftime('%H:%M:%S')} - {motivo.strip()}"
+        if msg not in self.lista_falhas:
+            self.lista_falhas.append(msg)
+        if hasattr(self, 'txt_falhas'):
+            self.atualizar_lista_falhas()
+
+    def atualizar_lista_falhas(self):
+        if not hasattr(self, 'txt_falhas'):
+            return
+        if not self.lista_falhas:
+            self.txt_falhas.setPlainText("Nenhuma falha registada.")
+            return
+        self.txt_falhas.setPlainText("\n".join(self.lista_falhas))
+
+    def bloquear_ecra(self):
+        self.inspecao_ativa = False
+        self.main_stack.setCurrentIndex(0)
+        if hasattr(self, 'login_screen') and self.login_screen is not None:
+            self.login_screen.user_input.clear()
+            self.login_screen.pass_input.clear()
 
     # ────────────────────────────────────────────────────────────────��[...]
     # BASE DE DADOS
@@ -652,6 +693,7 @@ class VisionProApp(QMainWindow):
         self.card_ok.lbl.setText(str(self.total_ok))
         self.card_nok.lbl.setText(str(self.total_fail))
         self.update_pie(self.total_ok, self.total_fail)
+        self.atualizar_lista_falhas()
 
     def atualizar_lista_modelos(self):
         for i in reversed(range(self.model_layout.count())):
@@ -921,40 +963,32 @@ class VisionProApp(QMainWindow):
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,0,255), 2)
 
         elif self.aba_ativa == "INSPECAO":
-            # CÓDIGO ANTIGO DA INSPEÇÃO — mantido comentado para poderes
-            # reativá-lo mais tarde, removendo o símbolo # destas linhas.
-            #
-            # if self.inspecao_ativa:
-            #     status_bruto, motivo_fail, resultado_roi = self.executar_inspecao(display_frame)
-            #     status     = self.estabilizar_status(status_bruto)
-            #     cor_status = (0,255,255) if status=="AGUARDAR" else ((0,255,0) if status=="OK" else (0,0,255))
-            #     cv2.putText(display_frame, f"STATUS: {status}", (w-300,50),
-            #                 cv2.FONT_HERSHEY_SIMPLEX, 1, cor_status, 3)
-            #     if motivo_fail:
-            #         cv2.putText(display_frame, motivo_fail, (20,40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, cor_status, 2)
-            #     if resultado_roi and resultado_roi.get("rois_dados"):
-            #         y = 70
-            #         for nome_roi, dados in resultado_roi["rois_dados"].items():
-            #             txt_roi = f"{nome_roi}: {dados.get('status','N/A')} | Fill={dados.get('fill_ratio',0):.3f}"
-            #             cv2.putText(display_frame, txt_roi, (20,y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (220,220,220), 1)
-            #             y += 18
-            #     if time.time() - self.ultima_gravacao > 1.2:
-            #         if status == "OK":
-            #             self.total_ok += 1
-            #         elif status != "AGUARDAR":
-            #             self.total_fail += 1
-            #         self.ultima_gravacao = time.time()
-            #         self.salvar_progresso_bd()
-            #         self.atualizar_ui_labels()
-            # else:
-            #     cv2.putText(display_frame, "INSPECAO PAUSADA [I]", (w//2-150, h//2),
-            #                 cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2)
-
-            # Novo comportamento: oculta imagem na inspeção.
-            display_frame = np.zeros_like(frame)
-            cv2.putText(display_frame, "IMAGEM OCULTADA - INSPECAO",
-                        (30, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.8,
-                        (180, 180, 180), 2)
+            if self.inspecao_ativa:
+                status_bruto, motivo_fail, resultado_roi = self.executar_inspecao(display_frame)
+                status     = self.estabilizar_status(status_bruto)
+                cor_status = (0,255,255) if status=="AGUARDAR" else ((0,255,0) if status=="OK" else (0,0,255))
+                cv2.putText(display_frame, f"STATUS: {status}", (w-300,50),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, cor_status, 3)
+                if motivo_fail:
+                    cv2.putText(display_frame, motivo_fail, (20,40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, cor_status, 2)
+                if resultado_roi and resultado_roi.get("rois_dados"):
+                    y = 70
+                    for nome_roi, dados in resultado_roi["rois_dados"].items():
+                        txt_roi = f"{nome_roi}: {dados.get('status','N/A')} | Fill={dados.get('fill_ratio',0):.3f}"
+                        cv2.putText(display_frame, txt_roi, (20,y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (220,220,220), 1)
+                        y += 18
+                if time.time() - self.ultima_gravacao > 1.2:
+                    if status == "OK":
+                        self.total_ok += 1
+                    elif status != "AGUARDAR":
+                        self.total_fail += 1
+                        self.registar_falha(motivo_fail or status)
+                    self.ultima_gravacao = time.time()
+                    self.salvar_progresso_bd()
+                    self.atualizar_ui_labels()
+            else:
+                cv2.putText(display_frame, "INSPECAO PAUSADA [I]", (w//2-150, h//2),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2)
 
         elif self.aba_ativa == "REFERENCIAS":
             if self.foto_referencia_processamento is not None:
@@ -1032,6 +1066,9 @@ class VisionProApp(QMainWindow):
                     cv2.putText(display_frame,
                                 "[S] Congelar  [M] Medir contínuo  [E] Medir espessura espuma",
                                 (20, h-20), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (120,120,120), 1)
+
+        elif self.aba_ativa == "FALHAS":
+            self.txt_falhas.setPlainText("\n".join(self.lista_falhas) if self.lista_falhas else "Nenhuma falha registada.")
 
         self.exibir_frame(display_frame)
 
@@ -1174,6 +1211,8 @@ class VisionProApp(QMainWindow):
 
     def reset_contadores(self):
         self.total_ok = self.total_fail = 0
+        self.lista_falhas.clear()
+        self.atualizar_lista_falhas()
         self.salvar_progresso_bd(); self.atualizar_ui_labels()
 
     def renomear_peca(self):
