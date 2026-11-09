@@ -12,6 +12,7 @@ if PROJECT_ROOT not in sys.path:
     sys.path.append(PROJECT_ROOT)
 from VISION.roi_inspection import ROIInspection
 from CORE.depth_integration import DepthMeasurer, DEPTH_AI_DISPONIVEL
+from failure_history import FailureHistory
 
 os.environ["QT_API"] = "pyside6"
 import matplotlib
@@ -25,7 +26,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                                QHBoxLayout, QPushButton, QLabel, QFrame,
                                QStackedWidget, QScrollArea, QGridLayout,
                                QButtonGroup, QInputDialog, QMessageBox, QLineEdit,
-                               QDoubleSpinBox)
+                               QDoubleSpinBox, QTableWidget, QTableWidgetItem)
 
 BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
 DB_NAME     = os.path.join(BASE_DIR, "sistema_industrial.db")
@@ -197,10 +198,12 @@ class VisionProApp(QMainWindow):
         self.total_ok                      = 0
         self.total_fail                    = 0
         self.ultima_gravacao               = 0
+        self.peca_atual_registada          = False
         self.valor_threshold               = 100
         self.valor_sensibilidade           = 800
         self.clahe         = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
         self.roi_inspector = ROIInspection(db_path=DB_NAME)
+        self.failure_history = FailureHistory(DB_NAME)
         self.historico_status = deque(maxlen=7)
 
         self.scale_factor = 1.0
@@ -233,9 +236,9 @@ class VisionProApp(QMainWindow):
 
         self.carregar_dados_iniciais()
 
-    # ──────────────────────────────────────────────────────────────────────────
+    # ────────────────────────────────────────────────────────────────��[...]
     # ESTILOS
-    # ──────────────────────────────────────────────────────────────────────────
+    # ────────────────────────────────────────────────────────────────��[...]
     def _apply_style(self):
         self.setStyleSheet("""
             QMainWindow { background-color: #0F1115; }
@@ -265,9 +268,9 @@ class VisionProApp(QMainWindow):
             QDoubleSpinBox { background-color: #0F1115; border: 1px solid #3E4451; color: white; padding: 6px; border-radius: 4px; }
         """)
 
-    # ──────────────────────────────────────────────────────────────────────────
+    # ────────────────────────────────────────────────────────────────��[...]
     # UI
-    # ──────────────────────────────────────────────────────────────────────────
+    # ────────────────────────────────────────────────────────────────��[...]
     def _init_ui(self):
         self.main_stack = QStackedWidget()
         self.setCentralWidget(self.main_stack)
@@ -306,6 +309,7 @@ class VisionProApp(QMainWindow):
                 ("MEDIÇÃO",      "MEDICAO",     0),
                 ("ESTATÍSTICAS", "ESTATISTICAS",1),
                 ("COMANDOS",     "COMANDOS",    2),
+                ("FALHAS",       "FALHAS",      3),
 ]
         for nome, chave, idx in abas:
             btn = QPushButton(nome)
@@ -495,9 +499,24 @@ class VisionProApp(QMainWindow):
             btn = QPushButton(txt); btn.setObjectName("ControlBtn")
             btn.setMinimumHeight(60); cmd_grid.addWidget(btn, i // 2, i % 2)
 
+        # Página 3 — Falhas
+        self.page_failures = QWidget()
+        failures_v = QVBoxLayout(self.page_failures)
+        failures_v.setContentsMargins(20, 20, 20, 20)
+        title_failures = QLabel("HISTÓRICO DE FALHAS")
+        title_failures.setStyleSheet("font-size:18px; color:#FF8C00; font-weight:bold;")
+        failures_v.addWidget(title_failures)
+        self.failures_table = QTableWidget(0, 5)
+        self.failures_table.setHorizontalHeaderLabels(["Data/hora", "ID modelo", "Modelo", "Operador", "Motivo"])
+        self.failures_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.failures_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.failures_table.setAlternatingRowColors(True)
+        failures_v.addWidget(self.failures_table)
+
         self.pages.addWidget(self.page_video)    # 0
         self.pages.addWidget(self.page_stats)    # 1
         self.pages.addWidget(self.page_cmds)     # 2
+        self.pages.addWidget(self.page_failures) # 3
 
         main_layout.addWidget(self.sidebar)
         main_layout.addWidget(self.pages)
@@ -530,9 +549,9 @@ class VisionProApp(QMainWindow):
         QShortcut(QKeySequence("F"), self, self.depth_capturar_referencia)
         QShortcut(QKeySequence("E"), self, self.depth_medir_espessura)
 
-    # ──────────────────────────────────────────────────────────────────────────
+    # ────────────────────────────────────────────────────────────────��[...]
     # BASE DE DADOS
-    # ──────────────────────────────────────────────────────────────────────────
+    # ────────────────────────────────────────────────────────────────��[...]
     def inicializar_bd(self):
         try:
             conn   = sqlite3.connect(DB_NAME)
@@ -566,6 +585,14 @@ class VisionProApp(QMainWindow):
             cursor.execute("SELECT COUNT(*) FROM usuarios")
             if cursor.fetchone()[0] == 0:
                 cursor.execute("INSERT INTO usuarios VALUES (?, ?)", ("admin", "1234"))
+            cursor.execute('''CREATE TABLE IF NOT EXISTS falhas (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                detected_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+                model_id INTEGER,
+                model_name TEXT,
+                operator TEXT,
+                reason TEXT NOT NULL)
+            ''')
             conn.commit(); conn.close()
         except sqlite3.Error as e:
             print(f"ERRO BD: {e}")
@@ -683,6 +710,42 @@ class VisionProApp(QMainWindow):
             self.ax.text(0, 0, f"TOTAL\n{ok+nok}", color='white', ha='center', va='center', fontweight='bold')
         self.ax.set_aspect('equal'); self.canvas.draw()
 
+    def refresh_failures(self):
+        rows = self.failure_history.latest(200)
+        self.failures_table.setRowCount(len(rows))
+        for row_index, row in enumerate(rows):
+            for col_index, value in enumerate(row):
+                self.failures_table.setItem(
+                    row_index,
+                    col_index,
+                    QTableWidgetItem("" if value is None else str(value)),
+                )
+        self.failures_table.resizeColumnsToContents()
+
+    def registrar_resultado_peca(self, status, motivo_fail):
+        if status == "AGUARDAR":
+            self.peca_atual_registada = False
+            return
+        if self.peca_atual_registada:
+            return
+        self.peca_atual_registada = True
+
+        if status == "OK":
+            self.total_ok += 1
+        elif status == "FAIL":
+            self.total_fail += 1
+            if self.peca_ativa_id is not None:
+                self.failure_history.record(
+                    self.peca_ativa_id,
+                    self.peca_ativa_nome,
+                    self.operador_autenticado,
+                    motivo_fail or "Falha sem motivo especificado",
+                )
+                self.refresh_failures()
+
+        self.salvar_progresso_bd()
+        self.atualizar_ui_labels()
+
     def salvar_progresso_bd(self):
         if self.peca_ativa_id is None: return
         conn = sqlite3.connect(DB_NAME)
@@ -690,9 +753,9 @@ class VisionProApp(QMainWindow):
                      (json.dumps(self.lista_poligonos), self.total_ok, self.total_fail, self.peca_ativa_id))
         conn.commit(); conn.close()
 
-    # ──────────────────────────────────────────────────────────────────────────
+    # ────────────────────────────────────────────────────────────────��[...]
     # PROFUNDIDADE / ESPESSURA DE ESPUMA
-    # ──────────────────────────────────────────────────────────────────────────
+    # ────────────────────────────────────────────────────────────────��[...]
 
     def medicao_congelar_frame(self):
         if self.frame_fixo_medicao is None:
@@ -824,9 +887,9 @@ class VisionProApp(QMainWindow):
         QMessageBox.information(self, "Resultado — Espessura de Espuma", msg)
         self._atualizar_estado_medicao()
 
-    # ──────────────────────────────────────────────────────────────────────────
+    # ────────────────────────────────────────────────────────────────��[...]
     # VISÃO COMPUTACIONAL
-    # ──────────────────────────────────────────────────────────────────────────
+    # ────────────────────────────────────────────────────────────────��[...]
     def processar_referencia(self, img):
         if img is None: return
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -892,9 +955,9 @@ class VisionProApp(QMainWindow):
         if len(self.historico_status) < 3: return status
         return Counter(self.historico_status).most_common(1)[0][0]
 
-    # ──────────────────────────────────────────────────────────────────────────
+    # ────────────────────────────────────────────────────────────────��[...]
     # LOOP PRINCIPAL
-    # ──────────────────────────────────────────────────────────────────────────
+    # ────────────────────────────────────────────────────────────────��[...]
     def atualizar_loop(self):
         ret, frame = self.cap.read()
         if not ret: return
@@ -933,13 +996,8 @@ class VisionProApp(QMainWindow):
                         cv2.putText(display_frame, txt_roi, (20,y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (220,220,220), 1)
                         y += 18
                 if time.time() - self.ultima_gravacao > 1.2:
-                    if status == "OK":
-                        self.total_ok += 1
-                    elif status != "AGUARDAR":
-                        self.total_fail += 1
+                    self.registrar_resultado_peca(status, motivo_fail)
                     self.ultima_gravacao = time.time()
-                    self.salvar_progresso_bd()
-                    self.atualizar_ui_labels()
             else:
                 cv2.putText(display_frame, "INSPECAO PAUSADA [I]", (w//2-150, h//2),
                             cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2)
@@ -1021,6 +1079,9 @@ class VisionProApp(QMainWindow):
                                 "[S] Congelar  [M] Medir contínuo  [E] Medir espessura espuma",
                                 (20, h-20), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (120,120,120), 1)
 
+        elif self.aba_ativa == "FALHAS":
+            self.refresh_failures()
+
         self.exibir_frame(display_frame)
 
     def exibir_frame(self, frame):
@@ -1040,9 +1101,9 @@ class VisionProApp(QMainWindow):
                Qt.TransformationMode.SmoothTransformation)
         self.video_label.setPixmap(pix)
 
-    # ──────────────────────────────────────────────────────────────────────────
+    # ────────────────────────────────────────────────────────────────��[...]
     # CLIQUES
-    # ──────────────────────────────────────────────────────────────────────────
+    # ────────────────────────────────────────────────────────────────��[...]
     def gerir_clique_esquerdo(self, x, y):
         real_x = int((x - self.offset_x) / self.scale_factor)
         real_y = int((y - self.offset_y) / self.scale_factor)
@@ -1077,15 +1138,17 @@ class VisionProApp(QMainWindow):
         else:
             self.ponto_atual = []
 
-    # ──────────────────────────────────────────────────────────────────────────
+    # ────────────────────────────────────────────────────────────────��[...]
     # COMANDOS
-    # ──────────────────────────────────────────────────────────────────────────
+    # ────────────────────────────────────────────────────────────────��[...]
     def mudar_aba(self, chave, idx):
         self.aba_ativa = chave
         self.pages.setCurrentIndex(idx)
         self.frame_fixo_treino = None
         self.ponto_atual       = []
         self.ctrl_stack.setCurrentIndex(1 if chave == "MEDICAO" else 0)
+        if chave == "FALHAS":
+            self.refresh_failures()
         for k, btn in self.nav_buttons.items():
             btn.setProperty("active", k == chave)
             btn.style().unpolish(btn); btn.style().polish(btn)
@@ -1093,6 +1156,7 @@ class VisionProApp(QMainWindow):
     def toggle_inspecao(self):
         self.inspecao_ativa = not self.inspecao_ativa
         self.historico_status.clear()
+        self.peca_atual_registada = False
 
     def toggle_medicao_continua(self):
         """Liga/desliga a medição contínua de espessura — independente da inspeção."""
@@ -1162,6 +1226,7 @@ class VisionProApp(QMainWindow):
 
     def reset_contadores(self):
         self.total_ok = self.total_fail = 0
+        self.peca_atual_registada = False
         self.salvar_progresso_bd(); self.atualizar_ui_labels()
 
     def renomear_peca(self):
